@@ -77,7 +77,7 @@ with col1:
 with col2:
     st.info("""
     **Rules Applied:**
-    - **Max of 5** Upload only 5 images at the same time.
+    - **Max of 5:** Upload only 5 images at the same time.
     - **Absence:** Greyed-out members marked as `(ABSENT)`.
     """)
 
