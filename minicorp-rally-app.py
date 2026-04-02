@@ -77,9 +77,7 @@ with col1:
 with col2:
     st.info("""
     **Rules Applied:**
-    - **Top-Right Name:** Ignored (This is just a UI label).
-    - **Rally Box List:** All names here are recorded (including the leader if they appear here).
-    - **Row Start:** Attendance lists start at **Row 1**.
+    - **Max of 5** Upload only 5 images at the same time.
     - **Absence:** Greyed-out members marked as `(ABSENT)`.
     """)
 
