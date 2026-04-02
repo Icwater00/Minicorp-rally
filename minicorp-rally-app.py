@@ -63,7 +63,7 @@ except Exception as e:
 
 # --- 4. UI HEADER ---
 st.title("⚔️ Guild Rally Attendance Portal")
-st.write("Extract rally participants. **Rally Leaders are filtered out from every page.**")
+st.write("Extracting names from the **Rally Box** list. Ignoring the top-right corner label.")
 
 col1, col2 = st.columns([2, 1])
 
@@ -77,9 +77,10 @@ with col1:
 with col2:
     st.info("""
     **Rules Applied:**
-    - **No Duplicates:** The Rally Leader (top-right) is excluded from every match.
-    - **Row Start:** Lists start at **Row 1**.
-    - **Status:** Greyed-out members marked as `(ABSENT)`.
+    - **Top-Right Name:** Ignored (This is just a UI label).
+    - **Rally Box List:** All names here are recorded (including the leader if they appear here).
+    - **Row Start:** Attendance lists start at **Row 1**.
+    - **Absence:** Greyed-out members marked as `(ABSENT)`.
     """)
 
 # --- 5. PROCESSING LOGIC ---
@@ -97,15 +98,16 @@ if uploaded_files:
                 img = Image.open(file)
                 img.thumbnail((1200, 1200)) 
                 
-                # REFINED PROMPT: Explicitly filter out the Rally Leader from ALL extractions
+                # REFINED PROMPT: Focus strictly on the list area
                 prompt = """
-                Analyze the 'Manage Rally' window:
-                1. Identify the 'Rally Leader' name (located at the top-right header next to the flag). 
-                2. DO NOT include the Rally Leader in the final list.
-                3. ONLY extract the names of the members listed in the main scrollable rally area.
-                4. For bright/active names, return: 'Name'.
-                5. For darkened/greyed-out names, return: 'Name (ABSENT)'.
-                6. Return a plain list, one name per line. No extra text or symbols.
+                Analyze the 'Manage Rally' UI in this screenshot:
+                1. IGNORE the name printed at the very top-right corner of the window (beside the flag). That is just a header.
+                2. LOOK ONLY at the scrollable list of players inside the 'Manage Rally' box.
+                3. EXTRACT all player names found INSIDE that list area. 
+                4. If a name appears in the list area, include it even if it was also at the top-right.
+                5. For bright/active names in the list, return: 'Name'.
+                6. For darkened/greyed-out names in the list, return: 'Name (ABSENT)'.
+                7. Return a plain list of names from the box area, one per line. No extra text.
                 """
                 
                 response = model.generate_content([prompt, img])
