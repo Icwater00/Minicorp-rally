@@ -6,50 +6,70 @@ import io
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Guild Rally Attendance",
+    page_title="Guild Rally Attendance Portal",
     page_icon="⚔️",
     layout="wide"
 )
 
-# Custom CSS to make it look "Gaming" oriented
+# Gaming-style UI enhancements
 st.markdown("""
     <style>
-    .main {
-        background-color: #0e1117;
-    }
-    ststButton>button {
+    .main { background-color: #0e1117; }
+    .stButton>button {
         width: 100%;
-        border-radius: 5px;
+        border-radius: 8px;
         height: 3em;
         background-color: #2ecc71;
         color: white;
+        font-weight: bold;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #27ae60;
+        border: none;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SECURITY & API SETUP ---
-# This pulls from the "Secrets" tab in Streamlit Cloud
+# --- 2. AUTHENTICATION & PRIVACY ---
+def check_password():
+    """Returns True if the user had the correct password."""
+    if "password_correct" not in st.session_state:
+        st.title("🛡️ Guild Access Control")
+        pwd = st.text_input("Enter Guild Member Password", type="password")
+        if st.button("Unlock Portal"):
+            if pwd == st.secrets.get("APP_PASSWORD", "admin123"): # Default if not set
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("🚫 Incorrect Password")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
+
+# --- 3. API SETUP ---
 try:
     if "GEMINI_API_KEY" in st.secrets:
         API_KEY = st.secrets["GEMINI_API_KEY"]
     else:
-        # Fallback for local testing (only if you have a secrets.toml)
-        API_KEY = st.sidebar.text_input("Enter API Key manually", type="password")
+        API_KEY = st.sidebar.text_input("Manual API Key (Development Only)", type="password")
     
     if API_KEY:
         genai.configure(api_key=API_KEY)
-        # Using Gemini 3 Flash for 2026 speed/accuracy
+        # Using Gemini 3 Flash for peak 2026 performance
         model = genai.GenerativeModel('gemini-3-flash-preview')
     else:
-        st.warning("⚠️ API Key missing. Please configure it in Streamlit Secrets.")
+        st.warning("⚠️ API Key missing. Please check Streamlit Secrets.")
         st.stop()
 except Exception as e:
-    st.error(f"Configuration Error: {e}")
+    st.error(f"Config Error: {e}")
     st.stop()
 
-# --- 3. UI HEADER ---
+# --- 4. UI HEADER ---
 st.title("⚔️ Guild Rally Attendance Portal")
-st.write("Upload screenshots of the **Manage Rally** screen to automatically generate a report.")
+st.write("Automatically extract rally participants while ignoring leaders and marking absences.")
 
 col1, col2 = st.columns([2, 1])
 
@@ -62,81 +82,71 @@ with col1:
 
 with col2:
     st.info("""
-    **Instructions:**
-    1. Upload one or more screenshots.
-    2. The AI will look only at the **Manage Rally** box.
-    3. Greyed-out names will be marked as **ABSENT**.
-    4. Download the final CSV for your records.
+    **Rules Applied:**
+    - **Rally Leaders:** Automatically ignored (top-right name).
+    - **Active Members:** Highlighted names are recorded.
+    - **Absent Members:** Greyed-out names are marked as `(ABSENT)`.
+    - **Data Export:** All matches combined into one clean CSV.
     """)
 
-# --- 4. PROCESSING LOGIC ---
+# --- 5. PROCESSING LOGIC ---
 if uploaded_files:
-    if st.button("🚀 Process Rally Attendance"):
+    if st.button("🚀 Start Processing Rally Attendance"):
         all_columns = {}
-        
-        # UI Progress elements
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Iterate through uploaded files
         for idx, file in enumerate(uploaded_files):
             file_name = file.name.split('.')[0]
-            status_text.text(f"Analyzing Match: {file_name}...")
+            status_text.text(f"⚔️ Analyzing: {file_name}...")
             
             try:
-                # Open image and resize for faster processing
                 img = Image.open(file)
                 img.thumbnail((1200, 1200)) 
                 
-                # The precise prompt for your game UI
+                # Refined Prompt for 2026 Vision Models
                 prompt = """
-                Look ONLY at the 'Manage Rally' box in this screenshot.
-                1. Extract player names that are highlighted or bright (Active players).
-                2. If a name is darkened or greyed out (like 'SCIPIO'), mark them as 'ABSENT'.
-                3. Ignore all other background text, stats, or UI buttons.
-                4. Return a plain list of names. 
-                   Format: 'Name' (for active) or 'Name (ABSENT)' (for greyed out).
-                5. One name per line. No extra text.
+                Analyze the 'Manage Rally' UI in this screenshot:
+                1. Focus ONLY on the list of members in the rally box.
+                2. IGNORE the Rally Leader (the name at the top right next to the flag).
+                3. EXTRACT all other player IGNs.
+                4. For bright/highlighted names, return: 'Name'.
+                5. For darkened/greyed-out names, return: 'Name (ABSENT)'.
+                6. Return a plain list, one per line. No headers or markdown.
                 """
                 
                 response = model.generate_content([prompt, img])
-                
-                # Clean and split the response into a list
                 names = [n.strip() for n in response.text.strip().split('\n') if n.strip()]
                 
-                # Map names to the filename column
                 all_columns[file_name] = names
-                
-                # Update progress bar
                 progress_bar.progress((idx + 1) / len(uploaded_files))
                 
             except Exception as e:
-                st.error(f"Error processing {file.name}: {e}")
+                st.error(f"Error in {file.name}: {e}")
 
-        # --- 5. RESULTS DISPLAY ---
+        # --- 6. DATA DISPLAY & DOWNLOAD ---
         if all_columns:
-            status_text.success(f"Successfully processed {len(uploaded_files)} images!")
+            status_text.success(f"✅ Processed {len(uploaded_files)} rally reports!")
             
-            # Create DataFrame (pandas handles mismatched row counts automatically)
+            # Create DataFrame
             df = pd.DataFrame.from_dict(all_columns, orient='index').transpose()
             
             st.divider()
-            st.subheader("📊 Combined Attendance Table")
+            st.subheader("📊 Consolidated Attendance Report")
             st.dataframe(df, use_container_width=True)
             
-            # Prepare CSV for download
+            # Export CSV
             csv_buffer = io.StringIO()
-            # utf-8-sig ensures Excel opens symbols like 'シ' correctly
             df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
-            csv_data = csv_buffer.getvalue()
             
             st.download_button(
-                label="📥 Download Attendance CSV",
-                data=csv_data,
-                file_name="rally_attendance_report.csv",
+                label="📥 Download Combined CSV",
+                data=csv_buffer.getvalue(),
+                file_name="guild_rally_report.csv",
                 mime="text/csv"
             )
 
-# --- 6. FOOTER ---
+# --- 7. FOOTER ---
 st.sidebar.markdown("---")
-st.sidebar.caption("Powered by Gemini 3 Flash • 2026")
+st.sidebar.caption("System Status: Operational")
+st.sidebar.caption("Model: Gemini 3 Flash • 2026")
